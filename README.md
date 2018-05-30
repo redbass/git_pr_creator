@@ -1,2 +1,3 @@
-# git_pr_creator
-Create pr from current branch
+# Git Pull Request Creator
+This script will automatically create a GitHub Pull Request with custom content 
+and title
