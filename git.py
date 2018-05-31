@@ -1,8 +1,10 @@
 import requests
+from requests.exceptions import HTTPError
 import subprocess
 from json import dumps
 
-GIT_API_URL = 'https://api.github.com/repos/{owner}/{project}/pulls'
+GIT_API_CREATE_PR_URL = 'https://api.github.com/repos/{owner}/{project}/pulls'
+GIT_API_ADD_LABEL_URL = 'https://api.github.com/repos/{owner}/{project}/issues/{pr_number}/labels'
 JIRA_URL = 'https://administrate.atlassian.net/browse/{ticket_number}'
 
 
@@ -11,7 +13,8 @@ def create_pr(branch_full_name,
               api_token,
               owner,
               project,
-              base_branch):
+              base_branch,
+              labels):
 
     data = dumps({
         "title": branch_full_name.replace('_', ' ').replace('-', ' '),
@@ -20,15 +23,26 @@ def create_pr(branch_full_name,
         "base": base_branch
     })
 
-    url = GIT_API_URL.format(owner=owner, project=project)
+    url = GIT_API_CREATE_PR_URL.format(owner=owner, project=project)
     header = {'Authorization': 'token {api_token}'.format(api_token=api_token)}
 
-    response = requests.post(url, data=data, headers=header)
+    try:
+        response = requests.post(url, data=data, headers=header)
+        response.raise_for_status()
+    except HTTPError as e:
+        if e.response is None:
+            raise
+        message = e.response.json().get('message')
+        raise Exception(str(e) + '. Message: ' + message)
 
-    if response.status_code in [200, 201]:
-        return response.json().get('html_url')
+    response_data = response.json()
+    html_url = response_data.get('html_url')
+    pr_number = response_data.get('number')
+    if isinstance(labels, list) and len(labels) > 0:
+        add_label_url = GIT_API_ADD_LABEL_URL.format(owner=owner, project=project, pr_number=pr_number)
+        requests.post(add_label_url, data=dumps(labels), headers=header)
 
-    raise Exception(response.json().get('message'))
+    return pr_number, html_url
 
 
 def open_git_pr_in_browser(href):
