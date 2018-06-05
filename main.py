@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 import argparse
-from git import get_git_branch_name, create_pr, \
-    open_git_pr_in_browser, make_jira_pr_body
+from git import get_git_branch_name, create_pr, get_ticket_number, update_labels
+from jira import make_jira_pr_body
+from utils import open_git_pr_in_browser
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-o", '--owner',
@@ -19,17 +20,28 @@ parser.add_argument("-l", '--label',
 
 args = parser.parse_args()
 
+api_token = args.api_token
+owner = args.owner
+project = args.project
+head_branch = args.head_branch
+labels = args.labels
+
 git_config = {
-    'api_token': args.api_token,
-    'owner': args.owner,
-    'project': args.project,
-    'base_branch': args.head_branch or 'development',
-    'labels': args.labels
+    'api_token': api_token,
+    'owner': owner,
+    'project': project,
+    'base_branch': head_branch or 'development',
+    'labels': labels
 }
 
 current_branch = get_git_branch_name()
-body = make_jira_pr_body(current_branch)
+ticket_number = get_ticket_number(current_branch)
+body = make_jira_pr_body(ticket_number)
+
 pr_number, pr_url = create_pr(branch_full_name=current_branch, body=body, **git_config)
+
+update_labels(pr_number=pr_number, **git_config)
+
 print('Pull request {number} created: {url}'.format(number=pr_number, url=pr_url))
 
 open_git_pr_in_browser(pr_url)
